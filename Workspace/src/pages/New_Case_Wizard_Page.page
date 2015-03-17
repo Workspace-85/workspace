@@ -1,0 +1,57 @@
+<apex:page standardController="Contact" extensions="NewCaseWizardController" showHeader="false" sidebar="false">
+<apex:includeScript value="/support/console/32.0/integration.js"/>
+
+    <!-- remove current date link from the calendar widget -->
+    <style>
+        span.dateInput span.dateFormat{
+            display:none;
+        }
+    </style>
+    
+    <flow:interview name="New_Case_Wizard" interview="{!newCaseWizardFlow}" finishLocation="{!finishLocation}">
+        <apex:param name="ContactID" value="{!contact.Id}" />
+    </flow:interview>
+    
+        <input id="hidCaseId" type="hidden" name="hidCaseId" value="{!newRecordId}" />   
+            <div align="center">{!newRecordId}</div>
+        <script type="text/javascript">
+        
+             var vCaseId = document.getElementById("hidCaseId").value;
+             var callback = function(result) { 
+                 if (result.success)
+                 {    
+                       //alert('The custom event CTIEvent is fired for Case Id : ' + vCaseId );
+                        //console.log('***** The custom event CTIEvent is fired for Case Id : ' + vCaseId);
+                 }
+                 else
+                 {    
+                      //alert('The custom event CTIEvent could not be fired!' );
+                      //console.log('***** The custom event CTIEvent could not be fired!");
+                  }   
+              };
+                
+             if (vCaseId.length > 0) {
+                   fireEvent();
+                }
+    
+             function fireEvent() 
+             { 
+                    //AJH --Removed white-space
+                    //var eventMsg = '{"action":"AttachData","Connector_NewCaseID":"'+ vCaseId +'"}' ;
+                    // creating JSON object and then converting it to Json text string 
+                 
+                     var eventMsg = {"action":"AttachData","Connector_NewCaseID":vCaseId} ;
+                     //alert(eventMsg.action);
+                     //alert(eventMsg.Connector_NewCaseID);
+                     var eventMsgStr = JSON.stringify(eventMsg);
+                    //alert("eventMsgStr: " + eventMsgStr);                 
+                 
+                    //Fire an event of type 'CTIEvent' 
+                    //console.log('***** Message send to CTIEvent' + eventMsgStr);
+                    sforce.console.fireEvent('CTIEvent', eventMsgStr, callback);
+                    
+             }
+              
+         </script>
+    
+</apex:page>

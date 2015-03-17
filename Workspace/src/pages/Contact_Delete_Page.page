@@ -1,0 +1,4 @@
+<apex:page standardController="Contact" showHeader="false" sidebar="false">
+  <br />
+  <h1>{!$Label.Contacts_Cannot_Be_Deleted}</h1>
+</apex:page>

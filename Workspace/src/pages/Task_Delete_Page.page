@@ -1,0 +1,4 @@
+<apex:page standardController="Task" showHeader="false" sidebar="false">
+  <br />
+  <h1>{!$Label.Tasks_Cannot_Be_Deleted}</h1>
+</apex:page>
