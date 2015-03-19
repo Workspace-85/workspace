@@ -1,0 +1,12 @@
+<apex:page standardController="Contact" recordSetVar="demoObj"  extensions="DemoController" >
+       <apex:pageBlock title="Testing">
+              <apex:pageBlockTable value="{!demoObj}" var="Obj">
+                     <apex:column value="{!Obj.Id}"/>
+                     <apex:column value="{!Obj.FirstName}"/>
+                     <apex:column value="{!Obj.LastName}"/>
+              </apex:pageBlockTable>      
+       </apex:pageBlock>
+       <apex:variable var="c" value="{!RecordDetails}" />
+        {!c.Id }  llllll          
+{!c.FirstName}
+</apex:page>
