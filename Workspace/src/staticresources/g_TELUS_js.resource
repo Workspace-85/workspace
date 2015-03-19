@@ -64,7 +64,7 @@ function processMessage(obj) {
         		_log("Internal call, no screen pop");
         		return;
         	}
-        	performScreenpopAction(obj);
+        	performVoiceScreenpopAction(obj);
         }
         else if (obj.type == "Email") {
             _log("processMessage: Email pop action for address: " + obj.source);
@@ -248,8 +248,8 @@ function prepareCreateTask(obj, objectIdForActivity)
 // Inbound and Outbound Voice handling
 ////////////////////////////////////////////////////////////////////////////////////////
 
-function performScreenpopAction(obj){
-	_log("in performScreenpopAction()");
+function performVoiceScreenpopAction(obj){
+	_log("in performVoiceScreenpopAction()");
 	//if this is from a click to dial, then just save the interaction id
 	var SFinteraction = (obj.userData.SFinteraction===undefined) ? "" : obj.userData.SFinteraction;
 	if(SFinteraction != ""){
@@ -268,18 +268,23 @@ function performScreenpopAction(obj){
 	
 	var screenPopObj = "";
 	
-	//check if first agent opened a new case
+	//a. Check for transfer/consult/conf
+    // 	 If it is then if KVP Connector_NewCaseID is present, then screen pop 
 	if(consult_trans_conf_call){
 		//orig agent opened a new Case
 		_log("voice checking Connector_NewCaseID");
 		screenPopObj = (obj.userData.Connector_NewCaseID===undefined) ? "" : obj.userData.Connector_NewCaseID;
 	}
 	
+	//b. If no screen pop, then check KVP Outcome_CaseID
+    //   If Outcome_CaseID is present, then screen pop Outcome_CaseID  
 	if(screenPopObj == ""){
 		_log("voice checking Outcome_CaseID");
 		screenPopObj = (obj.userData.Outcome_CaseID===undefined) ? "" : obj.userData.Outcome_CaseID;
 	}
 	
+	//c. If no screen pop, check for transfer/consult/conf
+    //   If it is then if KVP sfdcObjectId is present, then screen pop sfdcObjectId
 	if(screenPopObj == "" && consult_trans_conf_call){
 		//orig agent opened a Contact or Case 
 		_log("voice checking sfdcObjectId");
@@ -296,7 +301,16 @@ function performScreenpopAction(obj){
     	return;
     }
     
+    //d. If no screen pop, then check KVP TCCS_UTN
+    //   If TCCS_UTN is present, then check KVP TCCS_UTN to search for Contact phone fields.
+    //   If one Contact is found, then screen pop Contact. 
+
     screenPopObj = (obj.userData.TCCS_UTN===undefined) ? "" : obj.userData.TCCS_UTN;
+    if(screenPopObj == ""){
+    	//temp fix for anonymous caller and SD/DT1 has reported a TCCS_UTN in the record_found message
+    	screenPopObj = (obj.userData.TCCS_UTN_from_record_found===undefined) ? "" : obj.userData.TCCS_UTN_from_record_found;
+    	_log("using TCCS_UTN_from_record_found = " + screenPopObj);
+    }
     if(screenPopObj != ""){
     	//check for match
     	_log("call findContactFromANI with TCCS_UTN = " + screenPopObj);
@@ -305,22 +319,68 @@ function performScreenpopAction(obj){
         		_log("findContactFromANI returns " + o);
         		if(o != 'not found' && o != 'multiple found')
         		{
-        	    	Salesforce.screenPop(o);
+        	    	Salesforce.screenPop(o.Id);
         	    	activeInteractionID = obj.id;
-        	        var newData = '{"sfdcObjectId":"' + o + '","id":"' + activeInteractionID + '"}';
+        	        //var newData = '{"sfdcObjectId":"' + o.Id + '","id":"' + activeInteractionID + '"}';
         	    	return;
         		}
         		else
         		{
-        		    activeInteractionID = obj.id;
-        		    _log("default search");
-        		    Salesforce.SF_default_search(screenPopObj);
+        			continueVoiceScreenpopAction(obj);
+        			//activeInteractionID = obj.id;
+        		    //_log("default search");
+        		    //Salesforce.SF_default_search(screenPopObj);
         		}
             }		            
         });
         return;
     }
 
+    continueVoiceScreenpopAction(obj);
+    //    activeInteractionID = obj.id;
+    //    _log("default search");
+    //    Salesforce.SF_default_search(screenPopObj);
+}
+
+function continueVoiceScreenpopAction(obj){
+	_log("continueVoiceScreenpopAction");
+	
+	var screenPopObj = (obj.userData.TCCS_UTN===undefined) ? "" : obj.userData.TCCS_UTN;
+	
+	var SFinteraction = (obj.userData.SFinteraction===undefined) ? "" : obj.userData.SFinteraction;
+	var OtherDN = (obj.OtherDN===undefined) ? "" : obj.OtherDN;
+	if(OtherDN.length > 10){
+		OtherDN = OtherDN.substr(OtherDN.length - 10);
+	}
+	//e. If no screen pop, then check for outgoing call initiated from Workspace.
+    //   If it is then use OtherDN if present to search for Contact (
+	//   If 11 digits, the remove the first digit and use that 10 digit DN.
+    //   If one Contact is found, then screen pop Contact.
+	if(obj.calltype == "Outbound" && SFinteraction == "" && OtherDN != "" ){	
+		_log("voice checking OtherDN - " + OtherDN);
+        g_WorkspaceConnectorController.findContactFromANI(OtherDN, function(o) {
+        	if (o != null) {
+        		_log("findContactFromANI returns " + o);
+        		if(o != 'not found' && o != 'multiple found')
+        		{
+        	    	Salesforce.screenPop(o.Id);
+        	    	activeInteractionID = obj.id;
+        	        //var newData = '{"sfdcObjectId":"' + o.Id + '","id":"' + activeInteractionID + '"}';
+        	    	return;
+        		}
+        		else
+        		{
+        			//f. If no screen pop, then use TSCCS_UTN in URL for global SF search (sforce.interaction.screenPop):
+        		    activeInteractionID = obj.id;
+        		    _log("default search");
+        		    Salesforce.SF_default_search(screenPopObj);
+        		}
+            }		            
+        });
+		return;
+	}
+
+    //f. If no screen pop, then use TSCCS_UTN in URL for global SF search
     activeInteractionID = obj.id;
     _log("default search");
     Salesforce.SF_default_search(screenPopObj);

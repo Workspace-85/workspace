@@ -126,7 +126,7 @@ global class g_WorkspaceConnectorController {
               for (List<SObject> objList : cobjects)
                   for (SObject cobj : objList){
                     system.debug('*** findContactFromANI contact = '+ cobj.Id);
-                    return cobj.Id;
+                    return cobj;
                   } 
             }                
             return null; 
@@ -240,18 +240,38 @@ global class g_WorkspaceConnectorController {
         String callDx = activityMap.get('Voice Call Direction');
         //AJH -- commenting out OOB subject 
         //String subject = callType + ' ' + mediaType + ' ' + activityMap.get('DATE'); 
-        String subject = callDx + ' call ';
+        String subject = '';
+        if((activityMap.get('Subject') != null)){
+            subject = activityMap.get('Subject');
+        }
+        else {
+         subject = callDx + ' call ';
+        }
+        String TypeOfTask = callDx;
         String objectToUse = '';
         String duration = activityMap.get('Call Duration');
         Integer durationInSecs = Integer.valueOf(duration);
         
-        //subject for workitem        
+        //workitem handling        
         if(callType == 'InteractionWorkItem'){
             subject = 'Pushed Item';
+            TypeOfTask = 'Work Item';
+            //check for 
+            String workitemObj = activityMap.get('Outcome_CaseId');
+            if(workitemObj == '')
+                workitemObj = activityMap.get('Outcome_TaskId');
+            objectToUse = workitemObj;
+            system.debug('*** workitemObj = ' + workitemObj);
         }
-        String pushedWorkitem = activityMap.get('Outcome_CaseId');
-        if(pushedWorkitem == ''){
-            pushedWorkitem = activityMap.get('Outcome_TaskId');
+        String pushedWorkitem = activityMap.get('Outcome_TaskId');
+        String pushedItemSubject = '';
+        if(pushedWorkitem != ''){
+            try{
+                Task myTask= [SELECT Subject FROM Task WHERE Id= :pushedWorkitem];
+                pushedItemSubject = myTask.Subject;
+            }catch(Exception e) {
+            system.debug(e); 
+            }
         }
         
         DateTime startDate=null;
@@ -275,7 +295,7 @@ global class g_WorkspaceConnectorController {
                 system.debug('*** createActivity sfdc Object Id = ' + activityMap.get('sfdc Object Id'));
                 objectToUse = activityMap.get('sfdc Object Id');
         }
-        
+        /*
         if(objectToUse == ''){
            object objectFromLookup;
 
@@ -310,6 +330,7 @@ global class g_WorkspaceConnectorController {
           }
 
         }
+        */
         
         system.debug('*** createActivity for object ' + objectToUse);
         
@@ -331,18 +352,19 @@ global class g_WorkspaceConnectorController {
         
 
         Task t = new Task (
-          Type = 'Call',
+         
+          Type = TypeOfTask,
           Status = 'Completed',
           Subject = subject,
           CallDurationInSeconds = durationInSecs,            
           //Interaction_Type__c = callType,
-          //PJB Start__c = startDate,  //If we want to use the start of the interaction
-          //PJB End__c = endDate,  //If we want to use the end of the interaction
+   
           Description = activityMap.get('Comments'),
           CallDisposition = activityMap.get('Disposition'),
           CallObject = activityMap.get('GenesysId'),
           //AJH -- Added Custom Fields for Activity Creation
-      
+          // Commented for Package creation
+        /*
           Disposition__c = activityMap.get('Disposition'), 
           Call_Duration__c = activityMap.get('Call Duration'),
           Calling_Line_ID__c = activityMap.get('Calling Line Id'),
@@ -356,7 +378,9 @@ global class g_WorkspaceConnectorController {
           Transfer_History__c = activityMap.get('transfer history'),
           Activity_Date__c = activityMap.get('DATE'),
           Pushed_Item_ID__c = pushedWorkitem,
-        
+          Pushed_Item_Subject__c = pushedItemSubject,
+          */
+          
           CallType = activityMap.get('Voice Call Direction')
         );      
             
@@ -377,8 +401,14 @@ global class g_WorkspaceConnectorController {
             }
             else if(prefix == taskPrefix){
                 system.debug('*** create new task using Contact under the current Task ' + objectToUse);
-                Task myTask= [SELECT WhoId FROM Task WHERE Id= :objectToUse];
-                t.put('WhoId',myTask.WhoId);
+                Task myTask;
+                try{
+                    myTask= [SELECT WhoId FROM Task WHERE Id= :objectToUse];
+                }catch(QueryException e){
+                    system.debug('*** QueryException = ' + e);
+                }
+                if(myTask != null)
+                    t.put('WhoId',myTask.WhoId);
             }
             else{
               t.put('WhoId',objectToUse);
@@ -389,10 +419,16 @@ global class g_WorkspaceConnectorController {
         }    
         if(prefix == contactPrefix)
         {
-          Contact contact= [SELECT AccountId, Id FROM Contact WHERE Id= :objectToUse];
+          Contact contact;
+          try{
+            contact = [SELECT AccountId, Id FROM Contact WHERE Id= :objectToUse];
+          }catch(QueryException e){
+                    system.debug('*** QueryException = ' + e);
+          }          
           //AJH -- Added Contact Id for Debug 
           system.debug('*** create task for Contact ' + objectToUse);
-          t.put('WhatId',contact.AccountId);
+          if(contact != null)
+            t.put('WhatId',contact.AccountId);
             //AJH - Comment for myself
             //So we already set the WhoId above
             //Here we make sure we set the WhatId to the Account
@@ -436,6 +472,13 @@ global class g_WorkspaceConnectorController {
             system.debug('*** mySFDCfield5 ' + mySFDCfield + ' -- ' + mySFDCvalue);
             t.put(mySFDCfield,mySFDCvalue);
         }            
+          
+        //Activity Record Type Attempt to map Call_Activity_Record_Type
+       if (activityRecordType != null ) {
+        t.RecordTypeId = activityRecordType.Id;
+        } else {
+            system.debug('*** No activityRecordType');
+       }    
             
         try{                        
                 insert t;
@@ -445,6 +488,7 @@ global class g_WorkspaceConnectorController {
         }
         catch(DmlException e){
             t.put('WhatId',objectToUse);
+            system.debug('*** Invalid Id provided. Caught DMLException and using this object to create Activity :' + objecttoUse);
             insert t; 
         }
         system.debug('*** Task id = '  +t.Id);
@@ -583,7 +627,8 @@ global class g_WorkspaceConnectorController {
     {   
         return 'Active';
     }
-     
+
+/*     
     @RemoteAction
     global static String validateObject(String objectToUse)
     {   
@@ -620,4 +665,5 @@ global class g_WorkspaceConnectorController {
         }
         return ret;
     }
+*/    
 }

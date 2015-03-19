@@ -13,7 +13,7 @@
     </flow:interview>
     
         <input id="hidCaseId" type="hidden" name="hidCaseId" value="{!newRecordId}" />   
-            <div align="center">{!newRecordId}</div>
+            
         <script type="text/javascript">
         
              var vCaseId = document.getElementById("hidCaseId").value;

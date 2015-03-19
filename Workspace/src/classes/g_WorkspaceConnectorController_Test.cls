@@ -171,17 +171,25 @@ static testMethod void createActivity_Test() {
         Map<String,String> fieldsMap = new Map<String,String>();
         //create map
         fieldsMap.put('Genesys Call Type','Inbound');
+    	fieldsMap.put('Call Duration','35');
+    	fieldsMap.put('IXN Type','Voice-Inbound');
         fieldsMap.put('LOOKUP','4444');
         fieldsMap.put('Call Duration','35');
         fieldsMap.put('DATE','June1');
-        fieldsMap.put('Comments','');
+        fieldsMap.put('Comments','TESTING');
         fieldsMap.put('ANI','4444');
-    	fieldsMap.put('IXN Type','Phone');
+        fieldsMap.put('IXN Type','Phone');
         fieldsMap.put('Media Type','');
         fieldsMap.put('sfdc Object Id',ID);
-
-    	//Activity created as orhpan
-        String noIDResult = g_WorkspaceConnectorController.createActivity(fieldsMap);
+		fieldsMap.put('Subject','Inbound Call');
+    	fieldsMap.put('Disposition','Case Closed');
+    	fieldsMap.put('DNIS','4444');
+    	fieldsMap.put('ANI','1234');
+    	fieldsMap.put('Media Type','Voice');
+        fieldsMap.put('Subject','TEST');
+        //Activity created as orphan
+       String noIDResult = g_WorkspaceConnectorController.createActivity(fieldsMap);
+        //String noIDResult = '';
         System.assert(noIDResult != null);
     
         //Create Account test data
@@ -192,9 +200,10 @@ static testMethod void createActivity_Test() {
         Contact con = new Contact(FirstName = 'John', LastName = 'Doer', Phone = '4444', MobilePhone = '3333',Email = 'john.doer@somewhere.com');
         con.AccountId = newACC.Id;  //account id
         insert con;
-    	
-    	//Activity created under Contact using search
-    	String contactResult = g_WorkspaceConnectorController.createActivity(fieldsMap);
+        
+        //Activity created under Contact using search
+        String contactResult = g_WorkspaceConnectorController.createActivity(fieldsMap);
+        //String contactResult = '';
         System.assert(contactResult != null);
 
     	fieldsMap.put('IXN Type','Email');
@@ -212,35 +221,47 @@ static testMethod void createActivity_Test() {
         contactResult = g_WorkspaceConnectorController.createActivity(fieldsMap);
         System.assert(contactResult != null);        
     
-    	//Activity created under Contact using ID
-        Contact newCon = [SELECT Id FROM Contact WHERE Phone = '4444'];
-        ID = newCon.Id;
-    	System.Debug('sfdc Object Id = '+ID);
+        //Activity created under Contact using ID
+       Contact newCon = [SELECT Id FROM Contact WHERE Email = 'john.doer@somewhere.com'];  
+    	ID = newCon.Id;
+        System.Debug('sfdc Object Id = '+ID);
         fieldsMap.put('sfdc Object Id',ID);
-    	fieldsMap.put('SFDC1field','Description');
-    	fieldsMap.put('SFDC1value','Test1');
+        fieldsMap.put('SFDC1field','Description');
+        fieldsMap.put('SFDC1value','Test1');
         fieldsMap.put('SFDC2field','Description');
-    	fieldsMap.put('SFDC2value','Test2');
+        fieldsMap.put('SFDC2value','Test2');
         fieldsMap.put('SFDC3field','Description');
-    	fieldsMap.put('SFDC3value','Test3');
-    	fieldsMap.put('SFDC4field','Description');
-    	fieldsMap.put('SFDC4value','Test4');
-    	fieldsMap.put('SFDC5field','Description');
-    	fieldsMap.put('SFDC5value','Test5');    
+        fieldsMap.put('SFDC3value','Test3');
+        fieldsMap.put('SFDC4field','Description');
+        fieldsMap.put('SFDC4value','Test4');
+        fieldsMap.put('SFDC5field','Description');
+        fieldsMap.put('SFDC5value','Test5');  
+    	fieldsMap.put('subject','Inbound Call');
         contactResult = g_WorkspaceConnectorController.createActivity(fieldsMap);
         System.assert(contactResult != null);
 } 
 
 static testMethod void addAttachment_Test(){
-    Task t = new Task (
+    /*Task t = new Task (
           Type = 'Call',
           Status = 'Completed',
           Subject = 'Testttt',
           Priority = 'Normal',
           ActivityDate = System.today()
+        );*/
+        
+        Task t = new Task (
+         
+          Type = 'Call',
+          Status = 'Completed',
+          Subject = 'TEST',
+          CallDurationInSeconds = 34,           
+          Description = 'TEST',
+          Priority = 'Normal',
+          ActivityDate = System.today()
         );
         insert t;
-        Task myTask = [SELECT Id FROM Task WHERE Subject = 'Testttt'];
+        Task myTask = [SELECT Id FROM Task WHERE Subject = 'TEST'];
         String blobString= 'This is a string';
      	Blob b = Blob.valueOf(blobString);
         String result = g_WorkspaceConnectorController.addAttachment(myTask.Id,'Test Description','TestName1','txt',b,null);
